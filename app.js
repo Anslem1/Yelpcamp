@@ -1,112 +1,99 @@
-const express = require("express")
-const mongoose = require("mongoose");
-const ejsMate = require("ejs-mate")
-const path = require("path")
-const { campgroundSchema } = require("./Schema.js")
-const catchAsync = require("./utilty/catchAsync")
-const ExpressError =    require("./utilty/ExpressError")
-const methodOverride = require("method-override")
-const Campground = require("./models/campground");
-const res = require("express/lib/response");
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config()
+}
+// console.log(process.env.CLOUDINARY_SECRET)
+// console.log(process.env.CLOUDINARY_KEY)
 
-mongoose.connect("mongodb://localhost:27017/yelpcamp");
+const express = require('express')
+const mongoose = require('mongoose')
+const ejsMate = require('ejs-mate')
+const path = require('path')
+const flash = require('connect-flash')
+const session = require('express-session')
+// const { campgroundSchema, reviewSchema } = require("./Schema.js")
+// const catchAsync = require("./utilty/catchAsync")
+const ExpressError = require('./utilty/ExpressError')
+const methodOverride = require('method-override')
+const passport = require('passport')
+const localStrategy = require('passport-local')
+const User = require('./models/user')
+
+const res = require('express/lib/response')
+
+const campgroundRoutes = require('./Routes/campgrounds')
+const reviewRoutes = require('./Routes/reviews')
+const { date } = require('joi')
+const req = require('express/lib/request')
+const userRoutes = require('./Routes/Users')
+
+mongoose.connect('mongodb://localhost:27017/yelpcamp')
 
 const db = mongoose.connection
-db.on("error", console.error.bind(console, "connection error:"))
-db.once("open", () => {
-    console.log("Database connected")
+db.on('error', console.error.bind(console, 'connection error:'))
+db.once('open', () => {
+  console.log('Database connected')
 })
-
 
 const app = express()
 
+app.engine('ejs', ejsMate)
+app.set('view engine', 'ejs')
+app.set('views', path.join(__dirname, 'views'))
 
+app.use(express.urlencoded({ extended: true }))
+app.use(methodOverride('_method'))
+app.use(express.static(path.join(__dirname, 'public')))
+app.use(flash())
 
-app.engine("ejs", ejsMate)
-app.set("view engine", "ejs")
-app.set("views", path.join(__dirname, "views"))
-
-app.use(express.urlencoded({extended:true}))
-app.use(methodOverride("_method"));
-const validateCampground = (req, res, next) => {
-   
-   const { error } =  campgroundSchema.validate(req.body)
-   if(error){
-       const msg = error.details.map(el => el.message).join(",")
-     throw new ExpressError(msg, 404)
-   } else 
-   next()
-  // console.log(result)
+const sessionConfig = {
+  secret: 'thisshouldbeabettersecret',
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    httpOnly: true,
+    expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+    maxAge: 1000 * 60 * 60 * 24 * 7
+  }
 }
 
-app.get("/", (req, res) => {
-    res.render("home")
-});
-app.get("/makecampground", async(req, res)=> {
-    const camp = new Campground({title:"my backyard", description:"suii"})
-    await camp.save()
-    res.send("camp")
+app.use(session(sessionConfig))
+
+app.use(passport.initialize())
+app.use(passport.session())
+passport.use(new localStrategy(User.authenticate()))
+
+passport.serializeUser(User.serializeUser())
+passport.deserializeUser(User.deserializeUser())
+
+app.use((req, res, next) => {
+  if (!['/login', '/'].includes(req.originalUrl)) {
+    req.session.returnTo = req.originalUrl
+  }
+  res.locals.currentUser = req.user
+  res.locals.success = req.flash('success')
+  res.locals.error = req.flash('error')
+  next()
 })
 
-app.get("/campgrounds", async (req, res) => {
-    const campgrounds = await Campground.find({});
-    res.render("campgrounds/index", { campgrounds })
+app.use('/', userRoutes)
+app.use('/campgrounds', campgroundRoutes)
+app.use('/campgrounds/:id/reviews', reviewRoutes)
+
+app.get('/', (req, res) => {
+  res.render('home')
 })
 
-app.get("/campgrounds/new", (req, res) => {
-    res.render("campgrounds/new")
-    })
+app.all('*', (req, res, next) => {
+  next(new ExpressError('Page Not Found', 404))
+})
 
-    app.post("/campgrounds", validateCampground, catchAsync( async(req, res, next) => {
-       // if(!req.body.campground) throw new ExpressError("Invalid Campground data", 400)
-      
-     const campground = new Campground(req.body.campground) 
-      await campground.save() 
-      res.redirect(`/campgrounds/${campground._id}`)        
-    }))
-
-app.get("/campgrounds/:id", catchAsync( async (req, res) => {
-    const campground = await Campground.findById(req.params.id)
-    res.render("campgrounds/show", { campground })
-
-}));
-
-app.get("/campgrounds/:id/edit", catchAsync( async(req, res)=>{
-    const campground = await Campground.findById(req.params.id)
-    res.render("campgrounds/edit", { campground })
-}))
-
-app.put("/campgrounds/:id", validateCampground, catchAsync( async(req, res)=>{
-    const { id } = req.params
-   const campground = await Campground.findByIdAndUpdate(id, {...req.body.campground})
-   res.redirect(`/campgrounds/${campground._id}`)
-}))
-
-app.delete("/campgrounds/:id", catchAsync( async(req, res)=> {
-    const { id } = req.params
-    await Campground.findByIdAndDelete(id)
-    res.redirect("/campgrounds")
- }))
-
-// app.post("/campgrounds/:id/reviews", catchAsync(async(req,res) => {
-//      const campground = await Campground.findById(req.params.id)
-     
-// }))
-
- app.all("*", (req, res, next) => {
-    next(new ExpressError("Page Not Found", 404))
- })
-
- app.use((err, req, res, next) => {
-     const { statusCode = 500, message = "Something went wrong" } = err;
-     if(!err.message) err.message = "Oh No, Something went wrong"
-     res.status(statusCode).render("errors", { err })
-    // res.send("Something went Wrong")
- })
-
-
-  
+app.use((err, req, res, next) => {
+  const { statusCode = 500, message = 'Something went wrong' } = err
+  if (!err.message) err.message = 'Oh No, Something went wrong'
+  res.status(statusCode).render('errors', { err })
+  // res.send("Something went Wrong")
+})
 
 app.listen(3000, () => {
-console.log("serving on port 3000")
-});
+  console.log('serving on port 3000')
+})
