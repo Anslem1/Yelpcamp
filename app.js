@@ -1,8 +1,4 @@
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config()
-}
-// console.log(process.env.CLOUDINARY_SECRET)
-// console.log(process.env.CLOUDINARY_KEY)
+require('dotenv').config()
 
 const express = require('express')
 const mongoose = require('mongoose')
@@ -10,23 +6,31 @@ const ejsMate = require('ejs-mate')
 const path = require('path')
 const flash = require('connect-flash')
 const session = require('express-session')
-// const { campgroundSchema, reviewSchema } = require("./Schema.js")
-// const catchAsync = require("./utilty/catchAsync")
 const ExpressError = require('./utilty/ExpressError')
 const methodOverride = require('method-override')
 const passport = require('passport')
 const localStrategy = require('passport-local')
 const User = require('./models/user')
-
 const res = require('express/lib/response')
-
 const campgroundRoutes = require('./Routes/campgrounds')
 const reviewRoutes = require('./Routes/reviews')
-const { date } = require('joi')
+
 const req = require('express/lib/request')
 const userRoutes = require('./Routes/Users')
+const ExpressMongoSanitize = require('express-mongo-sanitize')
+const helmet = require('helmet')
+const  MongoDBStore  = require('connect-mongo')(session)
 
-mongoose.connect('mongodb://localhost:27017/yelpcamp')
+// const dbUrl = process.env.DB_URL
+//'mongodb://localhost:27017/yelpcamp'
+
+const dbUrl = process.env.DB_URL || 'mongodb://localhost:27017/yelpcamp'
+const secret = pro.ENV.SECRET || 'thisshouldbeabettersecret'
+
+
+// mongoose.connect(dbUrl)
+
+mongoose.connect(dbUrl)
 
 const db = mongoose.connection
 db.on('error', console.error.bind(console, 'connection error:'))
@@ -44,13 +48,29 @@ app.use(express.urlencoded({ extended: true }))
 app.use(methodOverride('_method'))
 app.use(express.static(path.join(__dirname, 'public')))
 app.use(flash())
+app.use(ExpressMongoSanitize({
+  replaceWith:"_"
+}))
+
+const store = new MongoDBStore({
+  url: dbUrl,
+ secret: secret,
+  touchAfter: 24 * 60 * 60
+})
+
+store.on("error", function(e){
+  console.log("SUII", e)
+})
 
 const sessionConfig = {
-  secret: 'thisshouldbeabettersecret',
+  store: store,
+  name:"session",
+  secret: secret ,
   resave: false,
   saveUninitialized: true,
   cookie: {
     httpOnly: true,
+    // secure: true,
     expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
     maxAge: 1000 * 60 * 60 * 24 * 7
   }
