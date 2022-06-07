@@ -3,9 +3,9 @@
 
 
 
-<div class="row">
-     <div class="col-6">
-          <div id='map'></div>
+<div class="row d-flex justify-content-center">
+     <div class="row d-flex">
+          <div id='map' class="d-flex"></div>
           <div
                id="carouselExampleControls"
                class="carousel slide"
@@ -55,9 +55,9 @@
                <% } %> 
           </div>
 
-          <div class="card mb-3">
-               <li class="list-group-item">
-                    <span style="font-family: Roboto; font-size: 25px">
+          <div class="card mb-3" id="campgroundAuthor">
+               <li >
+                    <span class="list-group-item">
                          Campground submitted by <%=campground.author.username%>
                     </span>
                </li>
