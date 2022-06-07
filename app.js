@@ -25,7 +25,7 @@ const  MongoDBStore  = require('connect-mongo')(session)
 //'mongodb://localhost:27017/yelpcamp'
 
 const dbUrl = process.env.DB_URL || 'mongodb://localhost:27017/yelpcamp'
-const secret = pro.ENV.SECRET || 'thisshouldbeabettersecret'
+const secret = process.env.SECRET || 'thisshouldbeabettersecret'
 
 
 // mongoose.connect(dbUrl)
@@ -113,7 +113,8 @@ app.use((err, req, res, next) => {
   res.status(statusCode).render('errors', { err })
   // res.send("Something went Wrong")
 })
+const port = process.env.PORT || 3000
 
-app.listen(3000, () => {
+app.listen(port, () => {
   console.log('serving on port 3000')
 })
