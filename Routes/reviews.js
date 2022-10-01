@@ -8,7 +8,7 @@ const reviews = require("../controllers/reviews");
 const {
      isLoggedIn,
      validateReview,
-     isReviewAuthor,
+     isReviewAuthor
      
 } = require("../middleware");
 
